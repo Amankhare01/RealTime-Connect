@@ -109,7 +109,7 @@ export default function ChatInput({
   };
 
   return (
-    <div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 p-3">
+<div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 px-2 py-1.5 sm:px-3 sm:py-3">
       {/* UPLOAD PROGRESS */}
       {progress > 0 && progress < 100 && (
         <div className="h-1 bg-gray-700 rounded mb-2">
@@ -140,14 +140,13 @@ export default function ChatInput({
         </div>
       )}
 
-      <div className="flex items-center gap-2">
+<div className="flex items-center gap-1.5 sm:gap-2">
         {/* ATTACH */}
         <div className="relative">
           <button
           title="Menu"
             onClick={() => setShowMenu((v) => !v)}
-            className="p-2 rounded-full hover:bg-gray-700 text-white"
-          >
+            className="p-1.5 sm:p-2 rounded-full hover:bg-gray-700 text-white">
             <Plus />
           </button>
 
@@ -182,14 +181,32 @@ export default function ChatInput({
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Type a message..."
           disabled={sending}
-          className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-full outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="
+  flex-1
+  bg-gray-700
+  text-white
+  px-3 py-1.5
+  sm:px-4 sm:py-2
+  text-sm sm:text-base
+  rounded-full
+  outline-none
+  focus:ring-2
+  focus:ring-blue-500
+"
         />
 
         {/* SEND */}
         <button
           onClick={sendMessage}
           disabled={sending}
-          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-full text-white font-medium disabled:opacity-50"
+          className="
+  bg-blue-600 hover:bg-blue-700
+  px-3 py-1.5
+  sm:px-4 sm:py-2
+  text-sm sm:text-base
+  rounded-full
+  text-white
+"
         >
           Send
         </button>

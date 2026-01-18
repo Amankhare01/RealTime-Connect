@@ -146,7 +146,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
+    <div className="flex flex-col h-[100dvh] bg-gray-900 overflow-hidden">
       <Header onSearch={handleSearch} />
 
       <div className="flex flex-1 overflow-hidden">
