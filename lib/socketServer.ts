@@ -1,53 +1,33 @@
-import { Server as IOServer } from "socket.io";
-import type { Server as HTTPServer } from "http";
+import { Server } from "socket.io";
+import http from "http";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var io: IOServer | undefined;
-}
+const server = http.createServer();
 
-export function getSocketServer(server: HTTPServer) {
-  if (!global.io) {
-    global.io = new IOServer(server, {
-      path: "/api/socket",
-      cors: {
-        origin: "*",
-      },
+const io = new Server(server, {
+  cors: {
+    origin: ["https://your-vercel-app.vercel.app"],
+    credentials: true,
+  },
+});
+
+const onlineUsers = new Set<string>();
+
+io.on("connection", (socket) => {
+  socket.on("user-online", (userId: string) => {
+    onlineUsers.add(userId);
+    io.emit("online-users", Array.from(onlineUsers));
+  });
+
+  socket.on("disconnect", () => {
+    onlineUsers.forEach((id) => {
+      if (socket.handshake.auth?.userId === id) {
+        onlineUsers.delete(id);
+      }
     });
+    io.emit("online-users", Array.from(onlineUsers));
+  });
+});
 
-    global.io.on("connection", (socket) => {
-      console.log("Socket connected:", socket.id);
-
-      // 🔥 sender emits -> server broadcasts
-      socket.on("sendMessage", (message) => {
-        socket.broadcast.emit("receiveMessage", message);
-      });
-
-      // 🔥 user online tracking (optional)
-      socket.on("user-online", (userId: string) => {
-        (socket as any).userId = userId;
-
-        const onlineUsers = Array.from(
-          global.io!.sockets.sockets.values()
-        )
-          .map((s: any) => s.userId)
-          .filter(Boolean);
-
-        global.io!.emit("online-users", onlineUsers);
-      });
-
-      socket.on("disconnect", () => {
-        const onlineUsers = Array.from(
-          global.io!.sockets.sockets.values()
-        )
-          .map((s: any) => s.userId)
-          .filter(Boolean);
-
-        global.io!.emit("online-users", onlineUsers);
-        console.log("Socket disconnected:", socket.id);
-      });
-    });
-  }
-
-  return global.io;
-}
+server.listen(4000, () => {
+  console.log("Socket server running on :4000");
+});
