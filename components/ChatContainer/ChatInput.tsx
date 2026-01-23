@@ -66,47 +66,46 @@ export default function ChatInput({
   };
 
   /* ---------- SEND MESSAGE ---------- */
-  const sendMessage = async () => {
-    if ((!text.trim() && !file) || sending) return;
+const sendMessage = async () => {
+  if ((!text || !text.trim()) && !file) return;
+  if (sending) return;
 
-    try {
-      setSending(true);
+  setSending(true);
 
-      const formData = new FormData();
-      formData.append("receiverId", receiverId);
-      if (text) formData.append("text", text);
-      if (file && fileType) {
-        formData.append("file", file);
-        formData.append("fileType", fileType);
-      }
+  try {
+    const formData = new FormData();
+    formData.append("receiverId", receiverId);
 
-      const res = await api.post<Message>(
-        "/api/messages",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          onUploadProgress: (e) => {
-            if (e.total) {
-              setProgress(
-                Math.round((e.loaded * 100) / e.total)
-              );
-            }
-          },
-        }
-      );
-
-      setMessages((prev) => [...prev, res.data]);
-
-      const socket = getSocket();
-      socket.emit("sendMessage", res.data);
-
-      resetInput();
-    } catch (err) {
-      alert("Failed to send message");
-    } finally {
-      setSending(false);
+    if (text.trim()) formData.append("text", text);
+    if (file && fileType) {
+      formData.append("file", file);
+      formData.append("fileType", fileType);
     }
-  };
+
+    const res = await api.post<Message>("/api/messages", formData);
+
+    // ✅ optimistic update
+    setMessages((prev) => [...prev, res.data]);
+
+    // ✅ emit AFTER save
+    const socket = getSocket();
+
+    if (socket.connected) {
+      socket.emit("sendMessage", res.data);
+    } else {
+      socket.once("connect", () => {
+        socket.emit("sendMessage", res.data);
+      });
+    }
+
+    resetInput();
+  } catch (err) {
+    console.error("Send failed", err);
+  } finally {
+    setSending(false);
+  }
+};
+
 
   return (
 <div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 px-2 py-1.5 sm:px-3 sm:py-3">

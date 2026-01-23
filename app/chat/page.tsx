@@ -61,34 +61,41 @@ export default function ChatPage() {
   }, [user]);
 
   /* ---------- SOCKET: MESSAGES ---------- */
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    const socket = getSocket();
+  const socket = getSocket();
 
-    socket.on("receiveMessage", (message: Message) => {
-      // update recent chat
-      setLastMessageMap((prev) => ({
+  const onReceiveMessage = (message: Message) => {
+    // 🔥 Update recent chat timestamp
+    setLastMessageMap((prev) => ({
+      ...prev,
+      [message.senderId]: message.createdAt,
+    }));
+
+    // 🔥 If this chat is open → append
+    if (
+      activeUser &&
+      (message.senderId === activeUser._id ||
+        message.receiverId === activeUser._id)
+    ) {
+      setMessages((prev) => [...prev, message]);
+    } else {
+      // 🔥 Otherwise mark unread
+      setUnreadMap((prev) => ({
         ...prev,
-        [message.senderId]: message.createdAt,
+        [message.senderId]: (prev[message.senderId] || 0) + 1,
       }));
+    }
+  };
 
-      if (message.senderId === activeUser?._id) {
-        setMessages((prev) => [...prev, message]);
-      } else {
-        setUnreadMap((prev) => ({
-          ...prev,
-          [message.senderId]: (prev[message.senderId] || 0) + 1,
-        }));
-      }
-    });
+  socket.on("receiveMessage", onReceiveMessage);
 
-    return () => {
-      socket.off("receiveMessage");
-    };
-  }, [user, activeUser]);
+  return () => {
+    socket.off("receiveMessage", onReceiveMessage);
+  };
+}, [user, activeUser]);
 
-  if (loading || !user) return null;
 
   /* ---------- SEARCH ---------- */
   const handleSearch = (value: string) => {
