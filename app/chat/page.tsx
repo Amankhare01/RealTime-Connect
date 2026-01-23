@@ -38,27 +38,27 @@ export default function ChatPage() {
   }, []);
 
   /* ---------- SOCKET: ONLINE / OFFLINE ---------- */
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    const socket = getSocket();
+  const socket = getSocket();
 
-    const goOnline = () => {
-      socket.emit("user-online", user._id);
-    };
+  const goOnline = () => {
+    socket.emit("user-online", user._id);
+  };
 
-    socket.on("connect", goOnline);
-    socket.on("online-users", (ids: string[]) => {
-      setOnlineUsers(ids);
-    });
+  socket.on("connect", goOnline);
+  socket.on("online-users", setOnlineUsers);
 
-    goOnline();
+  // emit immediately
+  goOnline();
 
-    return () => {
-      socket.off("connect", goOnline);
-      socket.off("online-users");
-    };
-  }, [user]);
+  return () => {
+    socket.off("connect", goOnline);
+    socket.off("online-users");
+  };
+}, [user]);
+
 
   /* ---------- SOCKET: MESSAGES ---------- */
 useEffect(() => {
