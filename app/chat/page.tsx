@@ -19,67 +19,74 @@ export default function ChatPage() {
   const [showChat, setShowChat] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // 🔥 unread + recent chat tracking
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
-  const [lastMessageMap, setLastMessageMap] =
-    useState<Record<string, string>>({});
-
-  const socket = getSocket();
+  const [lastMessageMap, setLastMessageMap] = useState<Record<string, string>>(
+    {}
+  );
 
   /* ---------- AUTH ---------- */
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
 
-  /* ---------- LOAD USERS ---------- */
+  /* ---------- LOAD CONTACTS ---------- */
   useEffect(() => {
-    api.get<User[]>("/api/users").then((res) => {
-      setUsers(res.data);
+    api.get("/api/contacts").then((res) => {
+      setUsers(res.data.users);
+      setLastMessageMap(res.data.lastMessageMap);
     });
   }, []);
 
-  useEffect(() => {
-  api.get("/api/contacts").then((res) => {
-    setUsers(res.data.users);
-    setLastMessageMap(res.data.lastMessageMap);
-  });
-}, []);
-
-
-  /* ---------- SOCKET ---------- */
+  /* ---------- SOCKET: ONLINE / OFFLINE ---------- */
   useEffect(() => {
     if (!user) return;
 
-    socket.emit("user-online", user._id);
+    const socket = getSocket();
 
+    const goOnline = () => {
+      socket.emit("user-online", user._id);
+    };
+
+    socket.on("connect", goOnline);
     socket.on("online-users", (ids: string[]) => {
       setOnlineUsers(ids);
     });
 
+    goOnline();
+
+    return () => {
+      socket.off("connect", goOnline);
+      socket.off("online-users");
+    };
+  }, [user]);
+
+  /* ---------- SOCKET: MESSAGES ---------- */
+  useEffect(() => {
+    if (!user) return;
+
+    const socket = getSocket();
+
     socket.on("receiveMessage", (message: Message) => {
-      // recent chat
+      // update recent chat
       setLastMessageMap((prev) => ({
         ...prev,
         [message.senderId]: message.createdAt,
       }));
 
-      // message handling
       if (message.senderId === activeUser?._id) {
         setMessages((prev) => [...prev, message]);
       } else {
         setUnreadMap((prev) => ({
           ...prev,
-          [message.senderId]:
-            (prev[message.senderId] || 0) + 1,
+          [message.senderId]: (prev[message.senderId] || 0) + 1,
         }));
       }
     });
 
     return () => {
-      socket.off("online-users");
       socket.off("receiveMessage");
     };
-  }, [user, socket, activeUser]);
+  }, [user, activeUser]);
 
   if (loading || !user) return null;
 
@@ -88,16 +95,11 @@ export default function ChatPage() {
     setSearchValue(value);
   };
 
-  /* ---------- USERS WITH CHAT ---------- */
   const usersWithChats = new Set(Object.keys(lastMessageMap));
 
-  /* ---------- FINAL CONTACT LIST ---------- */
-  const visibleUsers = [...users]
+  const visibleUsers = users
     .filter((u) => {
-      const isSearching = searchValue.trim().length > 0;
-      const hasChat = usersWithChats.has(u._id);
-
-      if (!isSearching) return hasChat;
+      if (!searchValue.trim()) return usersWithChats.has(u._id);
 
       const v = searchValue.toLowerCase();
       return (
@@ -140,20 +142,13 @@ export default function ChatPage() {
     }
   };
 
-  const handleBackToContacts = () => {
-    setShowChat(false);
-    setActiveUser(null);
-  };
-
   return (
     <div className="flex flex-col h-[100dvh] bg-gray-900 overflow-hidden">
       <Header onSearch={handleSearch} />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* CONTACT LIST */}
-        <div
-          className={`${showChat ? "hidden" : "block"} md:block w-full md:w-72`}
-        >
+        {/* CONTACTS */}
+        <div className={`${showChat ? "hidden" : "block"} md:block w-full md:w-72`}>
           <Sidebar
             users={visibleUsers}
             onlineUsers={onlineUsers}
@@ -168,7 +163,10 @@ export default function ChatPage() {
             activeUser={activeUser}
             messages={messages}
             setMessages={setMessages}
-            onBack={handleBackToContacts}
+            onBack={() => {
+              setShowChat(false);
+              setActiveUser(null);
+            }}
           />
         </div>
       </div>
