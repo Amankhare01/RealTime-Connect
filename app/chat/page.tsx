@@ -170,30 +170,48 @@ const visibleUsers = users
     <div className="flex flex-col h-[100dvh] bg-gray-900 overflow-hidden">
       <Header onSearch={handleSearch} />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* CONTACTS */}
-        <div className={`${showChat ? "hidden" : "block"} md:block w-full md:w-72`}>
-          <Sidebar
-            users={visibleUsers}
-            onlineUsers={onlineUsers}
-            unreadMap={unreadMap}
-            onSelect={handleSelectUser}
-          />
-        </div>
+<div className="flex flex-1 overflow-hidden">
+  {/* SIDEBAR */}
+  <div
+    className={`
+      ${showChat ? "hidden" : "block"}
+      md:block
+      w-full
+      md:w-72
+      flex-shrink-0
+    `}
+  >
+    <Sidebar
+      users={visibleUsers}
+      onlineUsers={onlineUsers}
+      unreadMap={unreadMap}
+      onSelect={handleSelectUser}
+    />
+  </div>
 
-        {/* CHAT */}
-        <div className={`${showChat ? "flex" : "hidden"} md:flex flex-1`}>
-          <ChatContainer
-            activeUser={activeUser}
-            messages={messages}
-            setMessages={setMessages}
-            onBack={() => {
-              setShowChat(false);
-              setActiveUser(null);
-            }}
-          />
-        </div>
-      </div>
+  {/* 🔹 DIVIDER (tablet + desktop only) */}
+  <div className="hidden md:block w-px bg-white/10" />
+
+  {/* CHAT */}
+  <div
+    className={`
+      ${showChat ? "flex" : "hidden"}
+      md:flex
+      flex-1
+      min-w-0
+    `}
+  >
+    <ChatContainer
+      activeUser={activeUser}
+      messages={messages}
+      setMessages={setMessages}
+      onBack={() => {
+        setShowChat(false);
+        setActiveUser(null);
+      }}
+    />
+  </div>
+</div>
     </div>
   );
 }
