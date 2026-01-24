@@ -23,6 +23,11 @@ export default function ChatPage() {
   const [lastMessageMap, setLastMessageMap] = useState<Record<string, string>>(
     {}
   );
+  /* ---------- INIT SOCKET SERVER ---------- */
+useEffect(() => {
+  fetch("/api/socket");
+}, []);
+
 
   /* ---------- AUTH ---------- */
   useEffect(() => {
