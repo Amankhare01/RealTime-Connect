@@ -103,31 +103,43 @@ useEffect(() => {
 
 
   /* ---------- SEARCH ---------- */
-  const handleSearch = (value: string) => {
-    setSearchValue(value);
-  };
+const handleSearch = async (value: string) => {
+  setSearchValue(value);
+
+  if (!value.trim()) return;
+
+  const res = await api.get(`/api/users/search?q=${value}`);
+  setUsers(res.data.users);
+};
+
 
   const usersWithChats = new Set(Object.keys(lastMessageMap));
 
-  const visibleUsers = users
-    .filter((u) => {
-      if (!searchValue.trim()) return usersWithChats.has(u._id);
+const visibleUsers = users
+  .filter((u) => {
+    const v = searchValue.trim().toLowerCase();
 
-      const v = searchValue.toLowerCase();
-      return (
-        u.email.toLowerCase().includes(v) ||
-        u._id.toLowerCase().includes(v)
-      );
-    })
-    .sort((a, b) => {
-      const tA = lastMessageMap[a._id]
-        ? new Date(lastMessageMap[a._id]).getTime()
-        : 0;
-      const tB = lastMessageMap[b._id]
-        ? new Date(lastMessageMap[b._id]).getTime()
-        : 0;
-      return tB - tA;
-    });
+    // 🔹 No search → show only users with chats
+    if (!v) {
+      return usersWithChats.has(u._id);
+    }
+
+    // 🔹 Search active → search all users
+    return (
+      u.email.toLowerCase().includes(v) ||
+      u._id.toLowerCase().includes(v)
+    );
+  })
+  .sort((a, b) => {
+    const tA = lastMessageMap[a._id]
+      ? new Date(lastMessageMap[a._id]).getTime()
+      : 0;
+    const tB = lastMessageMap[b._id]
+      ? new Date(lastMessageMap[b._id]).getTime()
+      : 0;
+    return tB - tA;
+  });
+
 
   /* ---------- SELECT USER ---------- */
   const handleSelectUser = async (selectedUser: User) => {
