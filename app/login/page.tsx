@@ -10,14 +10,19 @@ import Link from "next/link";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false); // 👈 NEW
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
 
   const login = async () => {
+    if (loading) return; // 👈 extra safety
+
     if (!email || !password) {
       toast.warn("Please fill all fields");
       return;
     }
+
+    setLoading(true); // 👈 disable button
 
     try {
       const res = await api.post("/api/auth/login", {
@@ -30,6 +35,8 @@ export default function LoginPage() {
       router.push("/chat");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Login failed");
+    } finally {
+      setLoading(false); // 👈 re-enable button
     }
   };
 
@@ -53,12 +60,15 @@ export default function LoginPage() {
 
         <button
           onClick={login}
-          className="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+          disabled={loading}
+          className={`py-2 rounded text-white transition
+            ${loading
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"}`}
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
 
-        {/* Link to Signup */}
         <p className="text-gray-400 text-sm text-center">
           Don’t have an account?{" "}
           <Link href="/signup" className="text-blue-400 hover:underline">
