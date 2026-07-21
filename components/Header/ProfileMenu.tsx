@@ -35,7 +35,7 @@ export default function ProfileMenu() {
   /* ---------- LOADING STATE ---------- */
   if (!user) {
     return (
-      <div className="w-9 h-9 rounded-full bg-gray-600 animate-pulse" />
+      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />
     );
   }
 
@@ -44,19 +44,19 @@ export default function ProfileMenu() {
       {/* AVATAR BUTTON */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-gray-700"
+        className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 hover:scale-[1.03] active:scale-[0.97] transition-all duration-150 cursor-pointer shadow-sm"
       >
         {user.profilePic ? (
           <Image
             src={user.profilePic}
             alt="Profile"
-            width={36}
-            height={36}
+            width={40}
+            height={40}
             className="object-cover w-full h-full"
             priority
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-semibold">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
             {user.fullName[0].toUpperCase()}
           </div>
         )}
@@ -64,9 +64,9 @@ export default function ProfileMenu() {
 
       {/* DROPDOWN */}
       {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded shadow-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700">
+        <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-200 animate-in">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex-shrink-0">
               {user.profilePic ? (
                 <Image
                   src={user.profilePic}
@@ -76,32 +76,39 @@ export default function ProfileMenu() {
                   className="object-cover w-full h-full"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white text-sm font-semibold">
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold">
                   {user.fullName[0].toUpperCase()}
                 </div>
               )}
             </div>
-            <div className="text-xs text-gray-300 truncate">
-              {user.email}
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                {user.fullName}
+              </div>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                {user.email}
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              setOpen(false);
-              router.push("/profile");
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-700 text-white text-sm"
-          >
-            Profile
-          </button>
+          <div className="py-1">
+            <button
+              onClick={() => {
+                setOpen(false);
+                router.push("/profile");
+              }}
+              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 text-sm font-medium transition-colors duration-150 cursor-pointer"
+            >
+              Profile Settings
+            </button>
 
-          <button
-            onClick={logout}
-            className="w-full text-left px-4 py-2 hover:bg-red-600 text-white text-sm"
-          >
-            Logout
-          </button>
+            <button
+              onClick={logout}
+              className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 text-sm font-semibold border-t border-slate-100 dark:border-slate-800 transition-colors duration-150 cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -64,49 +64,49 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0b1220] via-[#0f1b2d] to-[#0b1220] px-4">
-      <div className="relative w-full max-w-md rounded-2xl bg-[#0f172a] border border-white/10 shadow-2xl p-6">
+    <div className="min-h-screen flex items-center justify-center bg-bg-base dark:bg-gradient-to-br dark:from-[#0b1120] dark:via-[#0f1b2d] dark:to-[#0b1120] px-4 transition-colors duration-200 py-8">
+      <div className="relative w-full max-w-md rounded-2xl bg-bg-surface dark:bg-bg-surface/40 border border-border-subtle shadow-xl dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 sm:p-8 backdrop-blur-xl animate-in">
 
         {/* BACK */}
         <button
           onClick={() => router.back()}
-          className="absolute top-4 left-4 text-sm text-gray-400 hover:text-white"
+          className="absolute top-6 left-6 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold border border-border-subtle text-text-secondary bg-bg-surface/80 dark:bg-slate-950/20 hover:bg-bg-base dark:hover:bg-slate-800 transition-all duration-150 shadow-sm cursor-pointer"
         >
           ← Back
         </button>
 
         {/* HEADER */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-semibold text-white">
-            Profile
+        <div className="text-center mb-8 mt-6">
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
+            Profile Settings
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Manage your account details
+          <p className="text-xs sm:text-sm text-text-secondary mt-1.5 font-medium">
+            Manage your personal account details
           </p>
         </div>
 
         {/* AVATAR */}
-        <div className="relative flex justify-center">
+        <div className="relative flex justify-center mb-6">
           <div className="relative w-32 h-32">
             {/* Skeleton loader */}
             {loading && (
-              <div className="absolute inset-0 rounded-full bg-gray-700 animate-pulse" />
+              <div className="absolute inset-0 rounded-full bg-bg-base animate-pulse z-10" />
             )}
 
             <Image
               src={preview || user.profilePic || "/default.png"}
               alt="Profile"
               fill
-              className={`rounded-full object-cover ring-4 ring-blue-600/40 ${
+              className={`rounded-full object-cover ring-4 ring-accent-primary/20 dark:ring-accent-primary/40 shadow-md ${
                 loading ? "opacity-50" : ""
               }`}
             />
 
             <button
-            title="Profile Image"
+              title="Profile Image"
               disabled={loading}
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-1 right-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg disabled:opacity-50"
+              className="absolute bottom-1 right-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-2.5 rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <Camera size={18} />
             </button>
@@ -122,35 +122,41 @@ export default function ProfilePage() {
         </div>
 
         {/* INFO */}
-        <div className="mt-6 space-y-4 text-center">
+        <div className="space-y-5 text-center">
 
           {/* NAME */}
-          {isEditing ? (
-            <input
-            title="Full Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full bg-[#020617] border border-white/10 rounded-lg px-3 py-2 text-white text-center outline-none"
-            />
-          ) : (
-            <p className="text-lg font-semibold text-white">
-              {user.fullName}
-            </p>
-          )}
+          <div className="flex flex-col gap-1">
+            {isEditing && <label className="text-[11px] text-left text-text-secondary font-bold tracking-wider uppercase ml-1">Full Name</label>}
+            {isEditing ? (
+              <input
+                title="Full Name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="input-field w-full rounded-xl px-4 py-2.5 text-text-primary text-center text-sm sm:text-base"
+              />
+            ) : (
+              <p className="text-xl font-bold text-text-primary leading-tight">
+                {user.fullName}
+              </p>
+            )}
+          </div>
 
           {/* EMAIL */}
-          {isEditing ? (
-            <input
-            title="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#020617] border border-white/10 rounded-lg px-3 py-2 text-gray-300 text-center outline-none"
-            />
-          ) : (
-            <p className="text-sm text-gray-400">
-              {user.email}
-            </p>
-          )}
+          <div className="flex flex-col gap-1">
+            {isEditing && <label className="text-[11px] text-left text-text-secondary font-bold tracking-wider uppercase ml-1">Email Address</label>}
+            {isEditing ? (
+              <input
+                title="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-field w-full rounded-xl px-4 py-2.5 text-text-primary text-center text-sm sm:text-base"
+              />
+            ) : (
+              <p className="text-sm text-text-secondary mt-0.5 font-semibold">
+                {user.email}
+              </p>
+            )}
+          </div>
 
           {/* ACTION BUTTONS */}
           <div className="flex justify-center gap-3 pt-2">
@@ -159,13 +165,13 @@ export default function ProfilePage() {
                 <button
                   onClick={handleSaveProfile}
                   disabled={loading}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm disabled:opacity-50"
+                  className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-all duration-150 disabled:opacity-50 cursor-pointer shadow-sm shadow-green-500/10"
                 >
-                  <Check size={16} /> Save
+                  <Check size={16} /> Save Changes
                 </button>
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="flex items-center gap-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm"
+                  className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-slate-500 hover:bg-slate-600 text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer shadow-sm"
                 >
                   <X size={16} /> Cancel
                 </button>
@@ -173,17 +179,17 @@ export default function ProfilePage() {
             ) : (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-accent-primary hover:bg-blue-700 text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-all duration-150 cursor-pointer shadow-sm shadow-blue-500/15"
               >
-                <Pencil size={16} /> Edit Profile
+                <Pencil size={15} /> Edit Profile
               </button>
             )}
           </div>
 
           {/* USER ID */}
-          <div className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-400 break-all">
+          <div className="bg-bg-base/60 dark:bg-slate-950/60 border border-border-subtle/50 rounded-xl px-4 py-3 text-[11px] text-text-secondary break-all transition-colors duration-200 mt-4 leading-normal">
             User ID:{" "}
-            <span className="text-blue-400 font-medium">
+            <span className="text-accent-link font-bold ml-1 font-mono">
               {user._id}
             </span>
           </div>

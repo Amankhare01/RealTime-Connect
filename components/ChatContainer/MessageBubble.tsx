@@ -6,7 +6,19 @@ import type { Message } from "@/types/chat";
 import ImageModal from "@/components/common/ImageModal";
 import Image from "next/image";
 
-export default function MessageBubble({ msg }: { msg: Message }) {
+export default function MessageBubble({
+  msg,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
+  onReact,
+}: {
+  msg: Message;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onReact?: (id: string, emoji: string) => void;
+}) {
   const user = useAuthStore((s) => s.user);
   const [showImage, setShowImage] = useState(false);
 
@@ -14,94 +26,193 @@ export default function MessageBubble({ msg }: { msg: Message }) {
     msg.senderId === user?._id ||
     msg.senderId === (user as any)?.id;
 
+  const currentUserId = user?._id || "";
+
+  // Render reaction pill list
+  const reactionValues = msg.reactions ? Object.values(msg.reactions) : [];
+  const reactionCounts = reactionValues.reduce((acc, curr) => {
+    acc[curr] = (acc[curr] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   return (
     <>
-<div
-  className={`flex w-full mb-1 sm:mb-2 ${
-    isOwn ? "justify-end" : "justify-start"
-  }`}
->
+      <div
+        className={`group relative flex w-full items-center gap-3 mb-2 sm:mb-3 transition-all duration-200 ${
+          isOwn ? "justify-end" : "justify-start"
+        } ${isSelectMode ? "cursor-pointer" : ""}`}
+        onClick={() => {
+          if (isSelectMode && onToggleSelect) {
+            onToggleSelect(msg._id);
+          }
+        }}
+      >
+        {/* CHECKBOX FOR SELECT MODE */}
+        {isSelectMode && (
+          <div
+            className={`flex items-center shrink-0 justify-center w-6 h-6 rounded-full border-2 transition-all duration-150 ${
+              isSelected
+                ? "bg-blue-600 border-blue-600 text-white scale-105"
+                : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+            }`}
+          >
+            {isSelected && (
+              <span className="text-[10px] font-bold">✓</span>
+            )}
+          </div>
+        )}
 
-        <div
-          className={`
-            max-w-[80%] sm:max-w-[75%]
-            break-words overflow-hidden
-            px-3 py-2 text-sm leading-relaxed
-            rounded-2xl shadow-sm
-            ${
-              isOwn
-                ? "bg-blue-600 text-white rounded-br-md"
-                : "bg-neutral-800 text-white rounded-bl-md"
-            }
-          `}
-        >
-          {/* ---------- TEXT ---------- */}
-          {msg.text && (
-            <p className="whitespace-pre-wrap break-words">
-              {msg.text}
-            </p>
+        {/* MESSAGE BUBBLE CONTAINER */}
+        <div className={`relative ${isOwn ? "order-1" : "order-2"}`}>
+          {/* FLOATING HOVER REACTION BAR (only when not in select mode) */}
+          {!isSelectMode && onReact && (
+            <div className={`
+              opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200
+              absolute -top-9 z-20 flex gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-md scale-90 group-hover:scale-100 transition-transform origin-bottom
+              ${isOwn ? "right-0" : "left-0"}
+            `}>
+              {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => {
+                const hasReacted = msg.reactions?.[currentUserId] === emoji;
+                return (
+                  <button
+                    key={emoji}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReact(msg._id, emoji);
+                    }}
+                    className={`hover:scale-125 active:scale-95 transition-transform text-sm cursor-pointer p-0.5 rounded-full ${
+                      hasReacted ? "bg-blue-50 dark:bg-blue-950/40" : ""
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+            </div>
           )}
 
-          {/* ---------- IMAGE ---------- */}
-          {msg.fileType === "image" && msg.fileUrl ? (
-            <button
-              onClick={() => setShowImage(true)}
-              className="mt-2 block max-w-full"
-            >
-              <Image
-                src={msg.fileUrl}
-                alt="Chat image"
-                width={240}
-                height={240}
-                className="
-                  rounded-xl
-                  max-w-full h-auto
-                  object-cover
-                  cursor-pointer
-                  hover:opacity-90
-                "
-                unoptimized
-              />
-            </button>
-          ) : null}
+          {/* MAIN MESSAGE CARD */}
+          <div
+            className={`
+              max-w-[280px] sm:max-w-md
+              break-words overflow-hidden
+              px-3.5 py-2.5 text-sm leading-relaxed
+              shadow-sm transition-all duration-200
+              ${
+                isOwn
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm shadow-[0_2px_12px_rgba(59,130,246,0.15)]"
+                  : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-white/5 rounded-2xl rounded-tl-sm shadow-[0_2px_12px_rgba(15,23,42,0.04)]"
+              }
+              ${isSelected ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-950" : ""}
+            `}
+          >
+            {/* ---------- TEXT ---------- */}
+            {msg.text && (
+              <p className="whitespace-pre-wrap break-words text-sm sm:text-base font-normal">
+                {msg.text}
+              </p>
+            )}
 
-          {/* ---------- AUDIO ---------- */}
-          {msg.fileType === "audio" && msg.fileUrl ? (
-            <audio
-              controls
-              className="w-full mt-2 rounded-md"
-            >
-              <source src={msg.fileUrl} />
-            </audio>
-          ) : null}
+            {/* ---------- IMAGE ---------- */}
+            {msg.fileType === "image" && msg.fileUrl ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowImage(true);
+                }}
+                className="mt-2 block max-w-full overflow-hidden rounded-xl border border-black/5 dark:border-white/5 active:scale-[0.99] transition-transform cursor-pointer"
+              >
+                <Image
+                  src={msg.fileUrl}
+                  alt="Chat image"
+                  width={240}
+                  height={240}
+                  className="
+                    max-w-full h-auto
+                    object-cover
+                    hover:opacity-95
+                    transition-opacity
+                  "
+                  unoptimized
+                />
+              </button>
+            ) : null}
 
-          {/* ---------- DOCUMENT ---------- */}
-          {msg.fileType === "document" && msg.fileUrl ? (
-            <a
-              href={msg.fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="
-                mt-2 flex items-center gap-2
-                rounded-lg bg-black/20
-                px-3 py-2 text-xs
-                hover:bg-black/30 transition
-                break-all
-              "
-            >
-              <span>📄</span>
-              <span className="underline">
-                Open document
-              </span>
-            </a>
-          ) : null}
+            {/* ---------- AUDIO ---------- */}
+            {msg.fileType === "audio" && msg.fileUrl ? (
+              <audio
+                controls
+                className="w-full mt-2 rounded-xl max-w-[240px] text-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <source src={msg.fileUrl} />
+              </audio>
+            ) : null}
 
-          {/* ---------- TIMESTAMP ---------- */}
-          {msg.createdAt && (
-            <div className="mt-1 text-[10px] opacity-60 text-right select-none">
-              {new Date(msg.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
+            {/* ---------- DOCUMENT ---------- */}
+            {msg.fileType === "document" && msg.fileUrl ? (
+              <a
+                href={msg.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`
+                  mt-2 flex items-center gap-2.5
+                  rounded-xl px-3.5 py-2.5 text-xs font-semibold
+                  transition-all duration-150
+                  break-all shadow-sm border
+                  ${
+                    isOwn
+                      ? "bg-white/10 hover:bg-white/20 text-white border-white/10"
+                      : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/60 dark:hover:bg-slate-950/90 text-slate-800 dark:text-slate-200 border-slate-200/60 dark:border-white/5"
+                  }
+                `}
+              >
+                <span className="text-base">📄</span>
+                <span className="underline truncate">
+                  View Document
+                </span>
+              </a>
+            ) : null}
+
+            {/* ---------- TIMESTAMP ---------- */}
+            {msg.createdAt && (
+              <div className={`mt-1.5 text-[10px] select-none text-right font-medium tracking-wide ${
+                isOwn ? "text-white/70" : "text-slate-400 dark:text-slate-500"
+              }`}>
+                {new Date(msg.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ---------- EMOJI REACTION PILLS ---------- */}
+          {Object.keys(reactionCounts).length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "justify-end" : "justify-start"}`}>
+              {Object.entries(reactionCounts).map(([emoji, count]) => {
+                const hasReacted = msg.reactions?.[currentUserId] === emoji;
+                return (
+                  <button
+                    key={emoji}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReact?.(msg._id, emoji);
+                    }}
+                    className={`
+                      flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs shadow-sm transition-transform active:scale-95 cursor-pointer
+                      ${
+                        hasReacted
+                          ? "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-bold"
+                          : "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-white/5 text-slate-600 dark:text-slate-400"
+                      }
+                    `}
+                  >
+                    <span>{emoji}</span>
+                    <span className="text-[9px]">{count}</span>
+                  </button>
+                );
               })}
             </div>
           )}
@@ -118,3 +229,4 @@ export default function MessageBubble({ msg }: { msg: Message }) {
     </>
   );
 }
+

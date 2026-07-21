@@ -19,5 +19,7 @@ export interface Message {
   fileUrl?: string;
   fileType?: "image" | "audio" | "document";
 
+  reactions?: Record<string, string>; // userId -> emoji
+
   createdAt: string;
 }

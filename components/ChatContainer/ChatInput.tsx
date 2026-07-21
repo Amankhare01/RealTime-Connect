@@ -108,12 +108,12 @@ const sendMessage = async () => {
 
 
   return (
-<div className="sticky bottom-0 bg-gray-800 border-t border-gray-700 px-2 py-1.5 sm:px-3 sm:py-3">
+    <div className="sticky bottom-0 bg-white dark:bg-slate-900 border-t border-slate-300 dark:border-slate-800 px-3 py-3 sm:px-5 sm:py-4 transition-colors duration-200 pb-safe">
       {/* UPLOAD PROGRESS */}
       {progress > 0 && progress < 100 && (
-        <div className="h-1 bg-gray-700 rounded mb-2">
+        <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full mb-3 overflow-hidden">
           <div
-            className="h-1 bg-blue-600 rounded"
+            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-200"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -121,53 +121,62 @@ const sendMessage = async () => {
 
       {/* IMAGE PREVIEW */}
       {preview && (
-        <div className="mb-2 relative w-32">
+        <div className="mb-3 relative w-24 h-24 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-md animate-in">
           <Image
             src={preview}
             alt="preview"
-            width={128}
-            height={128}
-            className="rounded-lg object-cover"
+            fill
+            className="object-cover"
           />
           <button
-          title="Close"
+            title="Close"
             onClick={resetInput}
-            className="absolute -top-2 -right-2 bg-black rounded-full p-1"
+            className="absolute top-1 right-1 bg-slate-900/80 hover:bg-slate-950 text-white rounded-full p-1 shadow-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer"
           >
-            <X size={14} className="text-white" />
+            <X size={12} />
           </button>
         </div>
       )}
 
-<div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex items-center gap-2">
         {/* ATTACH */}
         <div className="relative">
           <button
-          title="Menu"
+            title="Menu"
             onClick={() => setShowMenu((v) => !v)}
-            className="p-1.5 sm:p-2 rounded-full hover:bg-gray-700 text-white">
-            <Plus />
+            className="p-2 sm:p-2.5 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-all duration-150 cursor-pointer flex items-center justify-center"
+          >
+            <Plus size={20} />
           </button>
 
           {showMenu && (
-            <div className="absolute bottom-12 left-0 bg-gray-900 border border-gray-700 rounded-lg shadow-lg w-40 z-10">
+            <div className="absolute bottom-14 left-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-xl w-44 z-20 py-1.5 overflow-hidden animate-in">
               <button
-                onClick={() => imageInputRef.current?.click()}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 text-white"
+                onClick={() => {
+                  imageInputRef.current?.click();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-900/60 text-slate-700 dark:text-slate-200 transition-colors duration-150 cursor-pointer flex items-center gap-2"
               >
-                📷 Image
+                <span>📷</span> Image
               </button>
               <button
-                onClick={() => audioInputRef.current?.click()}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 text-white"
+                onClick={() => {
+                  audioInputRef.current?.click();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-900/60 text-slate-700 dark:text-slate-200 transition-colors duration-150 cursor-pointer flex items-center gap-2"
               >
-                🎵 Audio
+                <span>🎵</span> Audio
               </button>
               <button
-                onClick={() => docInputRef.current?.click()}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 text-white"
+                onClick={() => {
+                  docInputRef.current?.click();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-900/60 text-slate-700 dark:text-slate-200 transition-colors duration-150 cursor-pointer flex items-center gap-2"
               >
-                📄 Document
+                <span>📄</span> Document
               </button>
             </div>
           )}
@@ -181,31 +190,35 @@ const sendMessage = async () => {
           placeholder="Type a message..."
           disabled={sending}
           className="
-  flex-1
-  bg-gray-700
-  text-white
-  px-3 py-1.5
-  sm:px-4 sm:py-2
-  text-sm sm:text-base
-  rounded-full
-  outline-none
-  focus:ring-2
-  focus:ring-blue-500
-"
+            flex-1
+            bg-slate-100 focus:bg-white dark:bg-slate-950 dark:focus:bg-slate-950
+            text-slate-850 dark:text-slate-100
+            placeholder-slate-400 dark:placeholder-slate-500
+            px-4 py-2.5
+            text-sm sm:text-base
+            rounded-xl
+            border border-transparent dark:border-white/5
+            outline-none
+            focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+            transition-all duration-200
+          "
         />
 
         {/* SEND */}
         <button
           onClick={sendMessage}
           disabled={sending}
-          className="
-  bg-blue-600 hover:bg-blue-700
-  px-3 py-1.5
-  sm:px-4 sm:py-2
-  text-sm sm:text-base
-  rounded-full
-  text-white
-"
+          className={`
+            px-4 py-2.5 sm:px-5
+            font-semibold text-sm sm:text-base
+            rounded-xl text-white shadow-sm
+            transition-all duration-150 active:scale-[0.97]
+            ${
+              sending
+                ? "bg-slate-400 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 cursor-pointer shadow-blue-500/10 hover:shadow-blue-500/25"
+            }
+          `}
         >
           Send
         </button>

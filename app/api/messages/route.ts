@@ -93,7 +93,7 @@ export async function POST(req: Request) {
       );
     }
 
-    let fileUrl: string | undefined;
+    let fileUrl = (formData.get("fileUrl") as string | null) || undefined;
 
     /* ---------- FILE VALIDATION ---------- */
     if (file) {
@@ -148,6 +148,54 @@ export async function POST(req: Request) {
   } catch (error) {
     return NextResponse.json(
       { message: "Message send failed" },
+      { status: 500 }
+    );
+  }
+}
+
+/* ======================================================
+   DELETE: Bulk Delete Messages
+====================================================== */
+export async function DELETE(req: Request) {
+  try {
+    await connectDB();
+
+    const cookieStore = await cookies();
+    const token = cookieStore.get("jwt")?.value;
+
+    if (!token) {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyJwt(token) as JwtPayload;
+
+    const { searchParams } = new URL(req.url);
+    const messageIdsStr = searchParams.get("messageIds");
+
+    if (!messageIdsStr) {
+      return NextResponse.json(
+        { message: "messageIds required" },
+        { status: 400 }
+      );
+    }
+
+    const messageIds = messageIdsStr.split(",");
+
+    const result = await Message.deleteMany({
+      _id: { $in: messageIds },
+      $or: [{ senderId: decoded.id }, { receiverId: decoded.id }],
+    });
+
+    return NextResponse.json(
+      { message: "Messages deleted successfully", count: result.deletedCount },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { message: "Failed to delete messages" },
       { status: 500 }
     );
   }

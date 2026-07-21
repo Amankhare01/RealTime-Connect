@@ -6,6 +6,7 @@ export interface IMessage extends Document {
   text?: string;
   fileUrl?: string;
   fileType?: "image" | "audio" | "document";
+  reactions?: Map<string, string>;
   createdAt: Date;
 }
 
@@ -18,6 +19,11 @@ const MessageSchema = new Schema<IMessage>(
     fileType: {
       type: String,
       enum: ["image", "audio", "document"],
+    },
+    reactions: {
+      type: Map,
+      of: String,
+      default: {},
     },
   },
   { timestamps: true }
