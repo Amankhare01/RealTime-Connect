@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/authStore";
 import type { Message } from "@/types/chat";
 import ImageModal from "@/components/common/ImageModal";
 import Image from "next/image";
+import { Check, CheckCheck, Smile, Pencil } from "lucide-react";
 
 export default function MessageBubble({
   msg,
@@ -12,15 +13,18 @@ export default function MessageBubble({
   isSelected = false,
   onToggleSelect,
   onReact,
+  onStartEdit,
 }: {
   msg: Message;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
   onReact?: (id: string, emoji: string) => void;
+  onStartEdit?: (msg: Message) => void;
 }) {
   const user = useAuthStore((s) => s.user);
   const [showImage, setShowImage] = useState(false);
+  const [showMobileReactions, setShowMobileReactions] = useState(false);
 
   const isOwn =
     msg.senderId === user?._id ||
@@ -38,7 +42,7 @@ export default function MessageBubble({
   return (
     <>
       <div
-        className={`group relative flex w-full items-center gap-3 mb-2 sm:mb-3 transition-all duration-200 ${
+        className={`group relative flex w-full items-center gap-2 sm:gap-3 mb-2 sm:mb-3 transition-all duration-200 ${
           isOwn ? "justify-end" : "justify-start"
         } ${isSelectMode ? "cursor-pointer" : ""}`}
         onClick={() => {
@@ -64,13 +68,16 @@ export default function MessageBubble({
 
         {/* MESSAGE BUBBLE CONTAINER */}
         <div className={`relative ${isOwn ? "order-1" : "order-2"}`}>
-          {/* FLOATING HOVER REACTION BAR (only when not in select mode) */}
+          {/* FLOATING HOVER / MOBILE REACTION BAR */}
           {!isSelectMode && onReact && (
-            <div className={`
-              opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200
-              absolute -top-9 z-20 flex gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-md scale-90 group-hover:scale-100 transition-transform origin-bottom
-              ${isOwn ? "right-0" : "left-0"}
-            `}>
+            <div
+              className={`
+                transition-all duration-200
+                absolute -top-9 z-20 flex gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-md origin-bottom
+                ${showMobileReactions ? "opacity-100 scale-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100 scale-90 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto"}
+                ${isOwn ? "right-0" : "left-0"}
+              `}
+            >
               {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => {
                 const hasReacted = msg.reactions?.[currentUserId] === emoji;
                 return (
@@ -78,6 +85,7 @@ export default function MessageBubble({
                     key={emoji}
                     onClick={(e) => {
                       e.stopPropagation();
+                      setShowMobileReactions(false);
                       onReact(msg._id, emoji);
                     }}
                     className={`hover:scale-125 active:scale-95 transition-transform text-sm cursor-pointer p-0.5 rounded-full ${
@@ -88,6 +96,21 @@ export default function MessageBubble({
                   </button>
                 );
               })}
+
+              {/* Edit button for message sender */}
+              {isOwn && msg.text && onStartEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMobileReactions(false);
+                    onStartEdit(msg);
+                  }}
+                  title="Edit message"
+                  className="hover:scale-110 active:scale-95 text-slate-500 hover:text-blue-600 transition-transform p-0.5 ml-1 border-l border-slate-200 dark:border-slate-700 pl-1.5 cursor-pointer"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
             </div>
           )}
 
@@ -175,17 +198,35 @@ export default function MessageBubble({
               </a>
             ) : null}
 
-            {/* ---------- TIMESTAMP ---------- */}
-            {msg.createdAt && (
-              <div className={`mt-1.5 text-[10px] select-none text-right font-medium tracking-wide ${
-                isOwn ? "text-white/70" : "text-slate-400 dark:text-slate-500"
-              }`}>
-                {new Date(msg.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-            )}
+            {/* ---------- METADATA FOOTER (TIMESTAMP, EDITED, READ STATUS) ---------- */}
+            <div className={`mt-1.5 flex items-center justify-end gap-1 text-[10px] select-none font-medium tracking-wide ${
+              isOwn ? "text-white/75" : "text-slate-400 dark:text-slate-500"
+            }`}>
+              {msg.isEdited && (
+                <span className="italic opacity-80 text-[9px] mr-0.5">(edited)</span>
+              )}
+              {msg.createdAt && (
+                <span>
+                  {new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+
+              {/* READ RECEIPTS */}
+              {isOwn && (
+                <span className="inline-flex items-center ml-0.5" title={`Status: ${msg.status || "sent"}`}>
+                  {msg.status === "read" ? (
+                    <CheckCheck size={13} className="text-cyan-300 dark:text-cyan-400 stroke-[2.5]" />
+                  ) : msg.status === "delivered" ? (
+                    <CheckCheck size={13} className="text-white/70 stroke-[2]" />
+                  ) : (
+                    <Check size={13} className="text-white/70 stroke-[2]" />
+                  )}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* ---------- EMOJI REACTION PILLS ---------- */}
@@ -217,6 +258,20 @@ export default function MessageBubble({
             </div>
           )}
         </div>
+
+        {/* MOBILE REACTION TRIGGER BUTTON (visible only on touch screens / small viewports without select mode) */}
+        {!isSelectMode && onReact && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMobileReactions((v) => !v);
+            }}
+            title="React"
+            className="sm:hidden p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors"
+          >
+            <Smile size={14} />
+          </button>
+        )}
       </div>
 
       {/* ---------- IMAGE MODAL ---------- */}
@@ -229,4 +284,5 @@ export default function MessageBubble({
     </>
   );
 }
+
 

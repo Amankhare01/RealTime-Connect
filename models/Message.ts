@@ -7,7 +7,11 @@ export interface IMessage extends Document {
   fileUrl?: string;
   fileType?: "image" | "audio" | "document";
   reactions?: Map<string, string>;
+  status?: "sent" | "delivered" | "read";
+  isEdited?: boolean;
+  editedAt?: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const MessageSchema = new Schema<IMessage>(
@@ -25,9 +29,22 @@ const MessageSchema = new Schema<IMessage>(
       of: String,
       default: {},
     },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "read"],
+      default: "sent",
+    },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
 export default mongoose.models.Message ||
   mongoose.model<IMessage>("Message", MessageSchema);
+

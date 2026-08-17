@@ -21,5 +21,10 @@ export interface Message {
 
   reactions?: Record<string, string>; // userId -> emoji
 
+  status?: "sent" | "delivered" | "read";
+  isEdited?: boolean;
+  editedAt?: string;
+
   createdAt: string;
 }
+

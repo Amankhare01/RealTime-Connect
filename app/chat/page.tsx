@@ -17,17 +17,16 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showChat, setShowChat] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
   const [lastMessageMap, setLastMessageMap] = useState<Record<string, string>>(
     {}
   );
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+
   /* ---------- INIT SOCKET SERVER ---------- */
   useEffect(() => {
     fetch("/api/socket");
   }, []);
-
 
   /* ---------- AUTH ---------- */
   useEffect(() => {
@@ -39,8 +38,15 @@ export default function ChatPage() {
     api.get("/api/contacts").then((res) => {
       setUsers(res.data.users);
       setLastMessageMap(res.data.lastMessageMap);
+    }).catch((err) => {
+      console.error("Failed to load contacts:", err);
     });
   }, []);
+
+  /* ---------- RESET TYPING WHEN ACTIVE USER CHANGES ---------- */
+  useEffect(() => {
+    setIsPartnerTyping(false);
+  }, [activeUser]);
 
   /* ---------- SOCKET: ONLINE / OFFLINE ---------- */
   useEffect(() => {
@@ -48,24 +54,33 @@ export default function ChatPage() {
 
     const socket = getSocket();
 
-    const goOnline = () => {
-      socket.emit("user-online", user._id);
+    const handleOnlineUsers = (usersList: string[]) => {
+      if (Array.isArray(usersList)) {
+        setOnlineUsers(usersList.map(String));
+      }
     };
 
-    socket.on("connect", goOnline);
-    socket.on("online-users", setOnlineUsers);
+    const goOnline = () => {
+      socket.emit("user-online", String(user._id));
+      socket.emit("get-online-users");
+    };
 
-    // emit immediately
-    goOnline();
+    socket.on("online-users", handleOnlineUsers);
+    socket.on("connect", goOnline);
+
+    if (socket.connected) {
+      goOnline();
+    } else {
+      socket.connect();
+    }
 
     return () => {
       socket.off("connect", goOnline);
-      socket.off("online-users");
+      socket.off("online-users", handleOnlineUsers);
     };
   }, [user]);
 
-
-  /* ---------- SOCKET: MESSAGES ---------- */
+  /* ---------- SOCKET: MESSAGES & REALTIME EVENTS ---------- */
   useEffect(() => {
     if (!user) return;
 
@@ -106,11 +121,45 @@ export default function ChatPage() {
       setMessages((prev) => prev.filter((msg) => !messageIds.includes(msg._id)));
     };
 
+    const onMessageUpdate = ({ messageId, text, isEdited }: { messageId: string; text: string; isEdited: boolean }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, text, isEdited } : msg
+        )
+      );
+    };
+
+    const onUserTyping = ({ senderId }: { senderId: string }) => {
+      if (activeUser && activeUser._id === senderId) {
+        setIsPartnerTyping(true);
+      }
+    };
+
+    const onUserStopTyping = ({ senderId }: { senderId: string }) => {
+      if (activeUser && activeUser._id === senderId) {
+        setIsPartnerTyping(false);
+      }
+    };
+
+    const onMessagesRead = ({ messageIds }: { messageIds?: string[] }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          !messageIds || messageIds.includes(msg._id)
+            ? { ...msg, status: "read" }
+            : msg
+        )
+      );
+    };
+
     socket.on("receiveMessage", onReceiveMessage);
     socket.on("messageReaction", onReceiveReaction);
     socket.on("receiveMessageReaction", onReceiveReaction);
     socket.on("messageDelete", onReceiveDelete);
     socket.on("receiveMessageDelete", onReceiveDelete);
+    socket.on("messageUpdate", onMessageUpdate);
+    socket.on("userTyping", onUserTyping);
+    socket.on("userStopTyping", onUserStopTyping);
+    socket.on("messagesRead", onMessagesRead);
 
     return () => {
       socket.off("receiveMessage", onReceiveMessage);
@@ -118,48 +167,12 @@ export default function ChatPage() {
       socket.off("receiveMessageReaction", onReceiveReaction);
       socket.off("messageDelete", onReceiveDelete);
       socket.off("receiveMessageDelete", onReceiveDelete);
+      socket.off("messageUpdate", onMessageUpdate);
+      socket.off("userTyping", onUserTyping);
+      socket.off("userStopTyping", onUserStopTyping);
+      socket.off("messagesRead", onMessagesRead);
     };
   }, [user, activeUser]);
-
-
-  /* ---------- SEARCH ---------- */
-  const handleSearch = async (value: string) => {
-    setSearchValue(value);
-
-    if (!value.trim()) return;
-
-    const res = await api.get(`/api/users/search?q=${value}`);
-    setUsers(res.data.users);
-  };
-
-
-  const usersWithChats = new Set(Object.keys(lastMessageMap));
-
-  const visibleUsers = users
-    .filter((u) => {
-      const v = searchValue.trim().toLowerCase();
-
-      // 🔹 No search → show only users with chats
-      if (!v) {
-        return usersWithChats.has(u._id);
-      }
-
-      // 🔹 Search active → search all users
-      return (
-        u.email.toLowerCase().includes(v) ||
-        u._id.toLowerCase().includes(v)
-      );
-    })
-    .sort((a, b) => {
-      const tA = lastMessageMap[a._id]
-        ? new Date(lastMessageMap[a._id]).getTime()
-        : 0;
-      const tB = lastMessageMap[b._id]
-        ? new Date(lastMessageMap[b._id]).getTime()
-        : 0;
-      return tB - tA;
-    });
-
 
   /* ---------- SELECT USER ---------- */
   const handleSelectUser = async (selectedUser: User) => {
@@ -186,9 +199,33 @@ export default function ChatPage() {
     }
   };
 
+  /* ---------- SELECT USER FROM SEARCH DROPDOWN ---------- */
+  const handleSelectUserFromSearch = async (selectedUser: User) => {
+    setUsers((prev) =>
+      prev.some((u) => u._id === selectedUser._id)
+        ? prev
+        : [selectedUser, ...prev]
+    );
+    await handleSelectUser(selectedUser);
+  };
+
+  const visibleUsers = [...users].sort((a, b) => {
+    const tA = lastMessageMap[a._id]
+      ? new Date(lastMessageMap[a._id]).getTime()
+      : 0;
+    const tB = lastMessageMap[b._id]
+      ? new Date(lastMessageMap[b._id]).getTime()
+      : 0;
+    return tB - tA;
+  });
+
+  const isActiveUserOnline = activeUser
+    ? onlineUsers.some((id) => String(id) === String(activeUser._id))
+    : false;
+
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-50 dark:bg-[#0b1220] overflow-hidden transition-colors duration-200">
-      <Header onSearch={handleSearch} />
+      <Header onSelectUser={handleSelectUserFromSearch} />
 
       <div className="flex flex-1 overflow-hidden w-full max-w-[1600px] mx-auto bg-white dark:bg-transparent md:border-x border-slate-300 dark:border-slate-800/60 shadow-sm">
         {/* SIDEBAR */}
@@ -229,6 +266,8 @@ export default function ChatPage() {
             messages={messages}
             setMessages={setMessages}
             contacts={users}
+            isTyping={isPartnerTyping}
+            isOnline={isActiveUserOnline}
             onBack={() => {
               setShowChat(false);
               setActiveUser(null);

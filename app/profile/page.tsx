@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/lib/axios";
+import ImageCropperModal from "@/components/common/ImageCropperModal";
 
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
@@ -13,7 +14,7 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [preview, setPreview] = useState<string | null>(null);
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // 🔥 Editable fields
@@ -23,27 +24,42 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  /* ---------- IMAGE UPDATE ---------- */
-  const handleImageUpdate = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  /* ---------- IMAGE SELECT -> OPEN CROPPER ---------- */
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setPreview(URL.createObjectURL(file));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setRawImageSrc(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so re-selecting same file triggers onChange
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  /* ---------- UPLOAD CROPPED SQUARE IMAGE ---------- */
+  const handleCroppedUpload = async (croppedFile: File) => {
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("profilepic", file);
+    formData.append("profilepic", croppedFile);
 
     try {
       const res = await api.put("/api/profile", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setUser(res.data.user);
+      setRawImageSrc(null);
+    } catch (err) {
+      console.error("Profile image upload failed:", err);
     } finally {
       setLoading(false);
-      setPreview(null);
     }
   };
 
@@ -58,10 +74,13 @@ export default function ProfilePage() {
       });
       setUser(res.data.user);
       setIsEditing(false);
+    } catch (err) {
+      console.error("Profile save failed:", err);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg-base dark:bg-gradient-to-br dark:from-[#0b1120] dark:via-[#0f1b2d] dark:to-[#0b1120] px-4 transition-colors duration-200 py-8">
@@ -94,7 +113,7 @@ export default function ProfilePage() {
             )}
 
             <Image
-              src={preview || user.profilePic || "/default.png"}
+              src={user.profilePic || "/default.png"}
               alt="Profile"
               fill
               className={`rounded-full object-cover ring-4 ring-accent-primary/20 dark:ring-accent-primary/40 shadow-md ${
@@ -103,7 +122,7 @@ export default function ProfilePage() {
             />
 
             <button
-              title="Profile Image"
+              title="Change Profile Photo"
               disabled={loading}
               onClick={() => fileInputRef.current?.click()}
               className="absolute bottom-1 right-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-2.5 rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
@@ -116,7 +135,7 @@ export default function ProfilePage() {
               type="file"
               accept="image/*"
               hidden
-              onChange={handleImageUpdate}
+              onChange={handleImageSelect}
             />
           </div>
         </div>
@@ -195,6 +214,17 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* CROPPER MODAL */}
+      {rawImageSrc && (
+        <ImageCropperModal
+          imageSrc={rawImageSrc}
+          loading={loading}
+          onCrop={handleCroppedUpload}
+          onClose={() => setRawImageSrc(null)}
+        />
+      )}
     </div>
   );
 }
+

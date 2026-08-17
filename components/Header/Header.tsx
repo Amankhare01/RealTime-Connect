@@ -5,11 +5,12 @@ import ProfileMenu from "./ProfileMenu";
 import { useAuthStore } from "@/store/authStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Sun, Moon } from "lucide-react";
+import type { User } from "@/types/chat";
 
 export default function Header({
-  onSearch,
+  onSelectUser,
 }: {
-  onSearch: (value: string) => void;
+  onSelectUser: (user: User) => void;
 }) {
   const { user, loading } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
@@ -39,7 +40,7 @@ export default function Header({
 
       {/* CENTER SEARCH */}
       <div className="flex-1 max-w-xs sm:max-w-md mx-auto">
-        <SearchBox onSearch={onSearch} />
+        <SearchBox onSelectUser={onSelectUser} />
       </div>
 
       {/* RIGHT PROFILE & THEME TOGGLE */}
@@ -61,3 +62,4 @@ export default function Header({
     </header>
   );
 }
+

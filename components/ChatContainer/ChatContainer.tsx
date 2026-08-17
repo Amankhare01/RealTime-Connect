@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import ChatInput from "./ChatInput";
 import MessageBubble from "./MessageBubble";
 import ChatHeader from "./ChatHeader";
 import type { User, Message } from "@/types/chat";
 import { api } from "@/lib/axios";
 import { getSocket } from "@/lib/socketClient";
-import { Trash2, Share2, X } from "lucide-react";
+import { Trash2, Share2, X, Loader2 } from "lucide-react";
+import Image from "next/image";
+
 
 export default function ChatContainer({
   activeUser,
@@ -15,33 +17,105 @@ export default function ChatContainer({
   setMessages,
   onBack,
   contacts = [],
+  isTyping = false,
+  isOnline = false,
 }: {
   activeUser: User | null;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   onBack?: () => void;
   contacts?: User[];
+  isTyping?: boolean;
+  isOnline?: boolean;
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Selection states
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showForwardModal, setShowForwardModal] = useState(false);
 
-  // ✅ Auto scroll on new message
+  // Editing state
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+
+  // Pagination states
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const shouldScrollToBottom = useRef(true);
+
+  // ✅ Auto scroll on new message or user change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
+    if (shouldScrollToBottom.current) {
+      bottomRef.current?.scrollIntoView({
+        behavior: "smooth",
+      });
+    }
+    shouldScrollToBottom.current = true;
   }, [messages]);
 
-  // Reset selection states when active user changes
+  // Reset selection states & pagination when active user changes
   useEffect(() => {
     setIsSelectMode(false);
     setSelectedIds(new Set());
     setShowForwardModal(false);
+    setEditingMessage(null);
+    setHasMore(true);
+    setLoadingOlder(false);
+    shouldScrollToBottom.current = true;
   }, [activeUser]);
+
+  // Load older messages (infinite scroll)
+  const loadOlderMessages = useCallback(async () => {
+    if (!activeUser || !hasMore || loadingOlder || messages.length === 0) return;
+
+    const oldestMsg = messages[0];
+    if (!oldestMsg?.createdAt) return;
+
+    setLoadingOlder(true);
+    const scrollElem = scrollContainerRef.current;
+    const prevScrollHeight = scrollElem ? scrollElem.scrollHeight : 0;
+    const prevScrollTop = scrollElem ? scrollElem.scrollTop : 0;
+
+    try {
+      const res = await api.get<Message[]>(
+        `/api/messages?receiverId=${activeUser._id}&limit=30&before=${encodeURIComponent(
+          oldestMsg.createdAt
+        )}`
+      );
+
+      if (res.data.length < 30) {
+        setHasMore(false);
+      }
+
+      if (res.data.length > 0) {
+        shouldScrollToBottom.current = false;
+        setMessages((prev) => [...res.data, ...prev]);
+
+        // Maintain scroll position after DOM update
+        requestAnimationFrame(() => {
+          if (scrollElem) {
+            scrollElem.scrollTop =
+              scrollElem.scrollHeight - prevScrollHeight + prevScrollTop;
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load older messages:", err);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [activeUser, hasMore, loadingOlder, messages, setMessages]);
+
+  // Handle scroll for loading older messages
+  const handleScroll = () => {
+    const elem = scrollContainerRef.current;
+    if (!elem) return;
+
+    if (elem.scrollTop <= 40 && hasMore && !loadingOlder) {
+      loadOlderMessages();
+    }
+  };
 
   if (!activeUser) {
     return (
@@ -173,11 +247,25 @@ export default function ChatContainer({
           onBack={onBack}
           isSelectMode={isSelectMode}
           onToggleSelectMode={handleToggleSelectMode}
+          isTyping={isTyping}
+          isOnline={isOnline}
         />
       </div>
 
-      {/* MESSAGES */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 bg-[#f4f6fc] dark:bg-slate-950/30">
+      {/* MESSAGES SCROLL CONTAINER */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 bg-[#f4f6fc] dark:bg-slate-950/30"
+      >
+        {/* Loading older messages indicator */}
+        {loadingOlder && (
+          <div className="flex items-center justify-center py-2 text-slate-400 text-xs gap-1.5 animate-in">
+            <Loader2 size={14} className="animate-spin text-blue-500" />
+            <span>Loading older messages...</span>
+          </div>
+        )}
+
         {messages.length === 0 ? (
           <div className="text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm mt-12 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 py-4 px-6 rounded-2xl max-w-xs mx-auto shadow-sm animate-in">
             👋 No messages yet. Say hello to start the chat!
@@ -192,6 +280,7 @@ export default function ChatContainer({
                 isSelected={selectedIds.has(msg._id)}
                 onToggleSelect={handleToggleSelectMessage}
                 onReact={handleReact}
+                onStartEdit={(msgToEdit) => setEditingMessage(msgToEdit)}
               />
             ))}
 
@@ -241,6 +330,8 @@ export default function ChatContainer({
           <ChatInput
             receiverId={activeUser._id}
             setMessages={setMessages}
+            editingMessage={editingMessage}
+            onCancelEdit={() => setEditingMessage(null)}
           />
         )}
       </div>
@@ -260,7 +351,7 @@ export default function ChatContainer({
             </div>
 
             <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 py-1 pr-1">
-              {contacts.filter(u => u._id !== activeUser._id).length === 0 ? (
+              {contacts.filter((u) => u._id !== activeUser._id).length === 0 ? (
                 <div className="text-center text-xs text-slate-400 py-6">
                   No other contacts available to forward to.
                 </div>
@@ -273,8 +364,18 @@ export default function ChatContainer({
                       onClick={() => handleForwardSelected(u._id)}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 text-left cursor-pointer transition-colors duration-150"
                     >
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                        {u.fullName[0].toUpperCase()}
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold shrink-0 bg-slate-200 dark:bg-slate-800">
+                        {u.profilePic ? (
+                          <Image
+                            src={u.profilePic}
+                            alt={u.fullName || u.email}
+                            width={32}
+                            height={32}
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          (u.fullName?.[0] || u.email?.[0] || "?").toUpperCase()
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold text-text-primary truncate">
@@ -285,6 +386,7 @@ export default function ChatContainer({
                         </div>
                       </div>
                     </button>
+
                   ))
               )}
             </div>
@@ -301,3 +403,4 @@ export default function ChatContainer({
     </div>
   );
 }
+

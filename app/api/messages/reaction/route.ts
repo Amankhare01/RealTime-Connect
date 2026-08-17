@@ -22,7 +22,15 @@ export async function PUT(req: Request) {
       );
     }
 
-    const decoded = verifyJwt(token) as JwtPayload;
+    let decoded: JwtPayload;
+    try {
+      decoded = verifyJwt(token) as JwtPayload;
+    } catch {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
     const { messageId, emoji } = await req.json();
 

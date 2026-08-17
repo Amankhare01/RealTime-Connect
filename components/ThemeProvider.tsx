@@ -15,30 +15,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
-    } else {
-      setTheme("light");
-    }
+    // Sync React state with the initial DOM class applied by the head script
+    const isDark = document.documentElement.classList.contains("dark");
+    setTheme(isDark ? "dark" : "light");
   }, []);
 
-  useEffect(() => {
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
     const root = window.document.documentElement;
-    if (theme === "dark") {
+    if (nextTheme === "dark") {
       root.classList.add("dark");
       root.style.colorScheme = "dark";
     } else {
       root.classList.remove("dark");
       root.style.colorScheme = "light";
     }
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    localStorage.setItem("theme", nextTheme);
+    setTheme(nextTheme);
   };
 
   return (
