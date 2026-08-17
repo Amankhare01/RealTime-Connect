@@ -17,17 +17,16 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showChat, setShowChat] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
   const [lastMessageMap, setLastMessageMap] = useState<Record<string, string>>(
     {}
   );
-  /* ---------- INIT SOCKET SERVER ---------- */
-useEffect(() => {
-  fetch("/api/socket");
-}, []);
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
 
+  /* ---------- INIT SOCKET SERVER ---------- */
+  useEffect(() => {
+    fetch("/api/socket");
+  }, []);
 
   /* ---------- AUTH ---------- */
   useEffect(() => {
@@ -39,107 +38,141 @@ useEffect(() => {
     api.get("/api/contacts").then((res) => {
       setUsers(res.data.users);
       setLastMessageMap(res.data.lastMessageMap);
+    }).catch((err) => {
+      console.error("Failed to load contacts:", err);
     });
   }, []);
 
+  /* ---------- RESET TYPING WHEN ACTIVE USER CHANGES ---------- */
+  useEffect(() => {
+    setIsPartnerTyping(false);
+  }, [activeUser]);
+
   /* ---------- SOCKET: ONLINE / OFFLINE ---------- */
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  const socket = getSocket();
+    const socket = getSocket();
 
-  const goOnline = () => {
-    socket.emit("user-online", user._id);
-  };
+    const handleOnlineUsers = (usersList: string[]) => {
+      if (Array.isArray(usersList)) {
+        setOnlineUsers(usersList.map(String));
+      }
+    };
 
-  socket.on("connect", goOnline);
-  socket.on("online-users", setOnlineUsers);
+    const goOnline = () => {
+      socket.emit("user-online", String(user._id));
+      socket.emit("get-online-users");
+    };
 
-  // emit immediately
-  goOnline();
+    socket.on("online-users", handleOnlineUsers);
+    socket.on("connect", goOnline);
 
-  return () => {
-    socket.off("connect", goOnline);
-    socket.off("online-users");
-  };
-}, [user]);
-
-
-  /* ---------- SOCKET: MESSAGES ---------- */
-useEffect(() => {
-  if (!user) return;
-
-  const socket = getSocket();
-
-  const onReceiveMessage = (message: Message) => {
-    // 🔥 Update recent chat timestamp
-    setLastMessageMap((prev) => ({
-      ...prev,
-      [message.senderId]: message.createdAt,
-    }));
-
-    // 🔥 If this chat is open → append
-    if (
-      activeUser &&
-      (message.senderId === activeUser._id ||
-        message.receiverId === activeUser._id)
-    ) {
-      setMessages((prev) => [...prev, message]);
+    if (socket.connected) {
+      goOnline();
     } else {
-      // 🔥 Otherwise mark unread
-      setUnreadMap((prev) => ({
+      socket.connect();
+    }
+
+    return () => {
+      socket.off("connect", goOnline);
+      socket.off("online-users", handleOnlineUsers);
+    };
+  }, [user]);
+
+  /* ---------- SOCKET: MESSAGES & REALTIME EVENTS ---------- */
+  useEffect(() => {
+    if (!user) return;
+
+    const socket = getSocket();
+
+    const onReceiveMessage = (message: Message) => {
+      // 🔥 Update recent chat timestamp
+      setLastMessageMap((prev) => ({
         ...prev,
-        [message.senderId]: (prev[message.senderId] || 0) + 1,
+        [message.senderId]: message.createdAt,
       }));
-    }
-  };
 
-  socket.on("receiveMessage", onReceiveMessage);
+      // 🔥 If this chat is open → append
+      if (
+        activeUser &&
+        (message.senderId === activeUser._id ||
+          message.receiverId === activeUser._id)
+      ) {
+        setMessages((prev) => [...prev, message]);
+      } else {
+        // 🔥 Otherwise mark unread
+        setUnreadMap((prev) => ({
+          ...prev,
+          [message.senderId]: (prev[message.senderId] || 0) + 1,
+        }));
+      }
+    };
 
-  return () => {
-    socket.off("receiveMessage", onReceiveMessage);
-  };
-}, [user, activeUser]);
+    const onReceiveReaction = ({ messageId, reactions }: { messageId: string; reactions: Record<string, string> }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, reactions } : msg
+        )
+      );
+    };
 
+    const onReceiveDelete = ({ messageIds }: { messageIds: string[] }) => {
+      setMessages((prev) => prev.filter((msg) => !messageIds.includes(msg._id)));
+    };
 
-  /* ---------- SEARCH ---------- */
-const handleSearch = async (value: string) => {
-  setSearchValue(value);
+    const onMessageUpdate = ({ messageId, text, isEdited }: { messageId: string; text: string; isEdited: boolean }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, text, isEdited } : msg
+        )
+      );
+    };
 
-  if (!value.trim()) return;
+    const onUserTyping = ({ senderId }: { senderId: string }) => {
+      if (activeUser && activeUser._id === senderId) {
+        setIsPartnerTyping(true);
+      }
+    };
 
-  const res = await api.get(`/api/users/search?q=${value}`);
-  setUsers(res.data.users);
-};
+    const onUserStopTyping = ({ senderId }: { senderId: string }) => {
+      if (activeUser && activeUser._id === senderId) {
+        setIsPartnerTyping(false);
+      }
+    };
 
+    const onMessagesRead = ({ messageIds }: { messageIds?: string[] }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          !messageIds || messageIds.includes(msg._id)
+            ? { ...msg, status: "read" }
+            : msg
+        )
+      );
+    };
 
-  const usersWithChats = new Set(Object.keys(lastMessageMap));
+    socket.on("receiveMessage", onReceiveMessage);
+    socket.on("messageReaction", onReceiveReaction);
+    socket.on("receiveMessageReaction", onReceiveReaction);
+    socket.on("messageDelete", onReceiveDelete);
+    socket.on("receiveMessageDelete", onReceiveDelete);
+    socket.on("messageUpdate", onMessageUpdate);
+    socket.on("userTyping", onUserTyping);
+    socket.on("userStopTyping", onUserStopTyping);
+    socket.on("messagesRead", onMessagesRead);
 
-const visibleUsers = users
-  .filter((u) => {
-    const v = searchValue.trim().toLowerCase();
-
-    // 🔹 No search → show only users with chats
-    if (!v) {
-      return usersWithChats.has(u._id);
-    }
-
-    // 🔹 Search active → search all users
-    return (
-      u.email.toLowerCase().includes(v) ||
-      u._id.toLowerCase().includes(v)
-    );
-  })
-  .sort((a, b) => {
-    const tA = lastMessageMap[a._id]
-      ? new Date(lastMessageMap[a._id]).getTime()
-      : 0;
-    const tB = lastMessageMap[b._id]
-      ? new Date(lastMessageMap[b._id]).getTime()
-      : 0;
-    return tB - tA;
-  });
-
+    return () => {
+      socket.off("receiveMessage", onReceiveMessage);
+      socket.off("messageReaction", onReceiveReaction);
+      socket.off("receiveMessageReaction", onReceiveReaction);
+      socket.off("messageDelete", onReceiveDelete);
+      socket.off("receiveMessageDelete", onReceiveDelete);
+      socket.off("messageUpdate", onMessageUpdate);
+      socket.off("userTyping", onUserTyping);
+      socket.off("userStopTyping", onUserStopTyping);
+      socket.off("messagesRead", onMessagesRead);
+    };
+  }, [user, activeUser]);
 
   /* ---------- SELECT USER ---------- */
   const handleSelectUser = async (selectedUser: User) => {
@@ -166,52 +199,82 @@ const visibleUsers = users
     }
   };
 
+  /* ---------- SELECT USER FROM SEARCH DROPDOWN ---------- */
+  const handleSelectUserFromSearch = async (selectedUser: User) => {
+    setUsers((prev) =>
+      prev.some((u) => u._id === selectedUser._id)
+        ? prev
+        : [selectedUser, ...prev]
+    );
+    await handleSelectUser(selectedUser);
+  };
+
+  const visibleUsers = [...users].sort((a, b) => {
+    const tA = lastMessageMap[a._id]
+      ? new Date(lastMessageMap[a._id]).getTime()
+      : 0;
+    const tB = lastMessageMap[b._id]
+      ? new Date(lastMessageMap[b._id]).getTime()
+      : 0;
+    return tB - tA;
+  });
+
+  const isActiveUserOnline = activeUser
+    ? onlineUsers.some((id) => String(id) === String(activeUser._id))
+    : false;
+
   return (
-    <div className="flex flex-col h-[100dvh] bg-gray-900 overflow-hidden">
-      <Header onSearch={handleSearch} />
+    <div className="flex flex-col h-[100dvh] bg-slate-50 dark:bg-[#0b1220] overflow-hidden transition-colors duration-200">
+      <Header onSelectUser={handleSelectUserFromSearch} />
 
-<div className="flex flex-1 overflow-hidden">
-  {/* SIDEBAR */}
-  <div
-    className={`
-      ${showChat ? "hidden" : "block"}
-      md:block
-      w-full
-      md:w-72
-      flex-shrink-0
-    `}
-  >
-    <Sidebar
-      users={visibleUsers}
-      onlineUsers={onlineUsers}
-      unreadMap={unreadMap}
-      onSelect={handleSelectUser}
-    />
-  </div>
+      <div className="flex flex-1 overflow-hidden w-full max-w-[1600px] mx-auto bg-white dark:bg-transparent md:border-x border-slate-300 dark:border-slate-800/60 shadow-sm">
+        {/* SIDEBAR */}
+        <div
+          className={`
+            ${showChat ? "hidden" : "block"}
+            md:block
+            w-full
+            md:w-80
+            lg:w-96
+            flex-shrink-0
+            border-r border-slate-300 dark:border-slate-800/60
+            h-full
+          `}
+        >
+          <Sidebar
+            users={visibleUsers}
+            onlineUsers={onlineUsers}
+            unreadMap={unreadMap}
+            onSelect={handleSelectUser}
+            activeUserId={activeUser?._id}
+          />
+        </div>
 
-  {/* 🔹 DIVIDER (tablet + desktop only) */}
-  <div className="hidden md:block w-px bg-white/10" />
-
-  {/* CHAT */}
-  <div
-    className={`
-      ${showChat ? "flex" : "hidden"}
-      md:flex
-      flex-1
-      min-w-0
-    `}
-  >
-    <ChatContainer
-      activeUser={activeUser}
-      messages={messages}
-      setMessages={setMessages}
-      onBack={() => {
-        setShowChat(false);
-        setActiveUser(null);
-      }}
-    />
-  </div>
-</div>
+        {/* CHAT */}
+        <div
+          className={`
+            ${showChat ? "flex" : "hidden"}
+            md:flex
+            flex-1
+            min-w-0
+            h-full
+            bg-white dark:bg-slate-950/10
+          `}
+        >
+          <ChatContainer
+            activeUser={activeUser}
+            messages={messages}
+            setMessages={setMessages}
+            contacts={users}
+            isTyping={isPartnerTyping}
+            isOnline={isActiveUserOnline}
+            onBack={() => {
+              setShowChat(false);
+              setActiveUser(null);
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -10,8 +10,6 @@ interface JwtPayload {
 
 export async function GET() {
   try {
-    await connectDB();
-
     const cookieStore = await cookies();
     const token = cookieStore.get("jwt")?.value;
 
@@ -22,7 +20,17 @@ export async function GET() {
       );
     }
 
-    const decoded = verifyJwt(token) as JwtPayload;
+    let decoded: JwtPayload;
+    try {
+      decoded = verifyJwt(token) as JwtPayload;
+    } catch {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
 
     const users = await User.find({ _id: { $ne: decoded.id } })
       .select("-password")
@@ -30,16 +38,11 @@ export async function GET() {
 
     return NextResponse.json(users, { status: 200 });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { message: "Failed to fetch users", error: error.message },
-        { status: 500 }
-      );
-    }
-
+    console.error("Users fetch error:", error);
     return NextResponse.json(
       { message: "Failed to fetch users" },
       { status: 500 }
     );
   }
 }
+
