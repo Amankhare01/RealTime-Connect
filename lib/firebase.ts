@@ -1,7 +1,7 @@
 "use client";
 
-import { initializeApp } from "firebase/app";
-import { getMessaging } from "firebase/messaging";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getMessaging, type Messaging } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,6 +11,22 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+const isConfigValid = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
 
-export const messaging = typeof window !== "undefined" ? getMessaging(app) : null;
+let messaging: Messaging | null = null;
+
+if (typeof window !== "undefined" && isConfigValid) {
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    messaging = getMessaging(app);
+  } catch (error) {
+    console.warn("Firebase Messaging initialization skipped or failed:", error);
+    messaging = null;
+  }
+}
+
+export { messaging };

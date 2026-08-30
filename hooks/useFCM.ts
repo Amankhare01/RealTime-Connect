@@ -22,7 +22,10 @@ export const useFCM = (userId?: string) => {
       setPermission(perm);
 
       if (perm === "granted") {
-        if (!messaging) return;
+        if (!messaging) {
+          console.warn("FCM messaging is not configured. Push token generation skipped.");
+          return;
+        }
         const token = await getToken(messaging, {
           vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
         });
@@ -32,7 +35,7 @@ export const useFCM = (userId?: string) => {
         }
       }
     } catch (error) {
-      console.error("Error requesting notification permission:", error);
+      console.warn("Error requesting notification permission:", error);
     }
   };
 
