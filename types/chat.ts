@@ -1,5 +1,6 @@
 /* ================= USER ================= */
 export interface User {
+  user: string;
   _id: string;            // ✅ MongoDB id
   fullName: string;
   email: string;
