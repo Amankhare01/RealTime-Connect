@@ -10,40 +10,54 @@ interface JwtPayload {
 }
 
 export async function GET() {
-  await connectDB();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("jwt")?.value;
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get("jwt")?.value;
-
-  if (!token) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-
-  const decoded = verifyJwt(token) as JwtPayload;
-
-  // Find all messages involving this user
-  const messages = await Message.find({
-    $or: [{ senderId: decoded.id }, { receiverId: decoded.id }],
-  }).sort({ createdAt: -1 });
-
-  // Map userId → lastMessageTime
-  const contactMap = new Map<string, string>();
-
-  for (const msg of messages) {
-    const otherUser =
-      msg.senderId === decoded.id ? msg.receiverId : msg.senderId;
-
-    if (!contactMap.has(otherUser)) {
-      contactMap.set(otherUser, msg.createdAt.toISOString());
+    if (!token) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    let decoded: JwtPayload;
+    try {
+      decoded = verifyJwt(token) as JwtPayload;
+    } catch {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    await connectDB();
+
+    // Find all messages involving this user
+    const messages = await Message.find({
+      $or: [{ senderId: decoded.id }, { receiverId: decoded.id }],
+    }).sort({ createdAt: -1 });
+
+    // Map userId → lastMessageTime
+    const contactMap = new Map<string, string>();
+
+    for (const msg of messages) {
+      const otherUser =
+        msg.senderId === decoded.id ? msg.receiverId : msg.senderId;
+
+      if (!contactMap.has(otherUser)) {
+        contactMap.set(otherUser, msg.createdAt.toISOString());
+      }
+    }
+
+    const users = await User.find({
+      _id: { $in: Array.from(contactMap.keys()) },
+    });
+
+    return NextResponse.json({
+      users,
+      lastMessageMap: Object.fromEntries(contactMap),
+    });
+  } catch (error) {
+    console.error("Contacts fetch error:", error);
+    return NextResponse.json(
+      { message: "Failed to fetch contacts" },
+      { status: 500 }
+    );
   }
-
-  const users = await User.find({
-    _id: { $in: Array.from(contactMap.keys()) },
-  });
-
-  return NextResponse.json({
-    users,
-    lastMessageMap: Object.fromEntries(contactMap),
-  });
 }
+

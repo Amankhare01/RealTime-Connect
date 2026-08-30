@@ -9,10 +9,10 @@ interface JwtPayload {
   id: string;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function PUT(req: Request) {
   try {
-    await connectDB();
-
     const cookieStore = await cookies();
     const token = cookieStore.get("jwt")?.value;
 
@@ -23,7 +23,17 @@ export async function PUT(req: Request) {
       );
     }
 
-    const decoded = verifyJwt(token) as JwtPayload;
+    let decoded: JwtPayload;
+    try {
+      decoded = verifyJwt(token) as JwtPayload;
+    } catch {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -40,11 +50,22 @@ export async function PUT(req: Request) {
     const image = formData.get("profilepic") as File | null;
 
     /* ---------- UPDATE NAME / EMAIL ---------- */
-    if (fullName) user.fullName = fullName;
-    if (email) user.email = email;
+    if (fullName) {
+      user.fullName = fullName.trim();
+    }
+    if (email) {
+      const trimmedEmail = email.toLowerCase().trim();
+      if (!EMAIL_REGEX.test(trimmedEmail)) {
+        return NextResponse.json(
+          { message: "Invalid email format" },
+          { status: 400 }
+        );
+      }
+      user.email = trimmedEmail;
+    }
 
     /* ---------- IMAGE UPLOAD ---------- */
-    if (image) {
+    if (image && image.size > 0) {
       const buffer = Buffer.from(await image.arrayBuffer());
 
       // Optional: delete old image
@@ -85,10 +106,19 @@ export async function PUT(req: Request) {
       message: "Profile updated",
       user,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      return NextResponse.json(
+        { message: "Email already in use" },
+        { status: 409 }
+      );
+    }
+
+    console.error("Profile update error:", error);
     return NextResponse.json(
       { message: "Profile update failed" },
       { status: 500 }
     );
   }
 }
+
