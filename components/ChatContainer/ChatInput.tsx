@@ -190,6 +190,7 @@ export default function ChatInput({
           disabled={sending}
           className="
             flex-1
+            min-w-0
             bg-transparent
             text-text-primary
             px-2 py-1.5
@@ -200,18 +201,18 @@ export default function ChatInput({
         />
 
         {/* EXTRA ICONS */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             title="Emoji"
             aria-label="Choose emoji"
-            className="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-1.5 sm:p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <Smile size={18} />
           </button>
           <button
             title="Attach image"
             aria-label="Attach image"
-            className="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-1.5 sm:p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             onClick={() => imageInputRef.current?.click()}
           >
             <Paperclip size={18} />
@@ -224,14 +225,14 @@ export default function ChatInput({
             title="Send"
             aria-label="Send message"
             className="
-              ml-1
+              shrink-0
               bg-blue-600 hover:bg-blue-500
               disabled:opacity-50 disabled:cursor-not-allowed
-              px-3.5 sm:px-4 py-2
+              h-9 px-3 sm:px-4
               text-sm font-medium
               rounded-xl
               text-white
-              flex items-center gap-1.5
+              flex items-center justify-center gap-1.5
               transition-colors
               shadow-sm shadow-blue-500/25
             "
