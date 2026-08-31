@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Message from "@/models/Message";
+import User from "@/models/User";
+import { sendPushNotification } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/verifyJwt";
 import cloudinary from "@/lib/cloudinary";
@@ -217,6 +219,54 @@ export async function POST(req: Request) {
       fileUrl,
       fileType,
       status: "sent",
+    });
+
+    // 🔔 Trigger FCM Push Notification (Non-blocking & Defensive)
+    // TODO: Skip push if receiver is actively viewing this chat in Socket.IO
+    (async () => {
+      try {
+        const [receiver, sender] = await Promise.all([
+          User.findById(receiverId).select("fcmTokens fullName"),
+          User.findById(decoded.id).select("fullName"),
+        ]);
+
+        if (receiver?.fcmTokens && receiver.fcmTokens.length > 0) {
+          const senderName = sender?.fullName || "New Message";
+          let body = text?.trim() || "";
+
+          if (!body) {
+            if (fileType === "image") body = "📷 Photo";
+            else if (fileType === "audio") body = "🎤 Voice message";
+            else if (fileType === "document") body = "📄 Document";
+            else body = "📎 Sent an attachment";
+          }
+
+          const result = await sendPushNotification(receiver.fcmTokens, {
+            title: senderName,
+            body,
+            data: {
+              senderId: String(decoded.id),
+              messageId: String(message._id),
+              chatId: String(decoded.id),
+              url: `/chat?userId=${decoded.id}`,
+            },
+          });
+
+          // Task 3: Prune stale / invalid tokens
+          if (result.staleTokens && result.staleTokens.length > 0) {
+            await User.findByIdAndUpdate(receiverId, {
+              $pullAll: { fcmTokens: result.staleTokens },
+            });
+            console.log(
+              `🧹 Pruned ${result.staleTokens.length} stale FCM token(s) for user ${receiverId}`
+            );
+          }
+        }
+      } catch (pushErr) {
+        console.error("FCM push notification dispatch error:", pushErr);
+      }
+    })().catch((err) => {
+      console.error("Unhandled error in background FCM push:", err);
     });
 
     return NextResponse.json(message, { status: 201 });

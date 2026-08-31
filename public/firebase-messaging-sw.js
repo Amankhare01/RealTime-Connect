@@ -12,8 +12,35 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: "/chat-icon.png",
+  const title = payload.notification?.title || payload.data?.title || "New Message";
+  const body = payload.notification?.body || payload.data?.body || "";
+  const url = payload.data?.url || payload.fcmOptions?.link || "/chat";
+
+  self.registration.showNotification(title, {
+    body,
+    icon: "/favicon.ico",
+    data: {
+      url,
+      ...payload.data,
+    },
   });
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/chat";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes("/chat") && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
 });
