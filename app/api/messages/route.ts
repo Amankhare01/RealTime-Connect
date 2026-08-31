@@ -221,53 +221,55 @@ export async function POST(req: Request) {
       status: "sent",
     });
 
-    // 🔔 Trigger FCM Push Notification (Non-blocking & Defensive)
+    // 🔔 Trigger FCM Push Notification
     // TODO: Skip push if receiver is actively viewing this chat in Socket.IO
-    (async () => {
-      try {
-        const [receiver, sender] = await Promise.all([
-          User.findById(receiverId).select("fcmTokens fullName"),
-          User.findById(decoded.id).select("fullName"),
-        ]);
+    try {
+      const [receiver, sender] = await Promise.all([
+        User.findById(receiverId).select("fcmTokens fullName"),
+        User.findById(decoded.id).select("fullName"),
+      ]);
 
-        if (receiver?.fcmTokens && receiver.fcmTokens.length > 0) {
-          const senderName = sender?.fullName || "New Message";
-          let body = text?.trim() || "";
+      if (receiver?.fcmTokens && receiver.fcmTokens.length > 0) {
+        const senderName = sender?.fullName || "New Message";
+        let body = text?.trim() || "";
 
-          if (!body) {
-            if (fileType === "image") body = "📷 Photo";
-            else if (fileType === "audio") body = "🎤 Voice message";
-            else if (fileType === "document") body = "📄 Document";
-            else body = "📎 Sent an attachment";
-          }
-
-          const result = await sendPushNotification(receiver.fcmTokens, {
-            title: senderName,
-            body,
-            data: {
-              senderId: String(decoded.id),
-              messageId: String(message._id),
-              chatId: String(decoded.id),
-              url: `/chat?userId=${decoded.id}`,
-            },
-          });
-
-          // Task 3: Prune stale / invalid tokens
-          if (result.staleTokens && result.staleTokens.length > 0) {
-            await User.findByIdAndUpdate(receiverId, {
-              $pullAll: { fcmTokens: result.staleTokens },
-            });
-            console.log(
-              `🧹 Pruned ${result.staleTokens.length} stale FCM token(s) for user ${receiverId}`
-            );
-          }
+        if (!body) {
+          if (fileType === "image") body = "📷 Photo";
+          else if (fileType === "audio") body = "🎤 Voice message";
+          else if (fileType === "document") body = "📄 Document";
+          else body = "📎 Sent an attachment";
         }
-      } catch (pushErr) {
-        console.error("FCM push notification dispatch error:", pushErr);
+
+        const result = await sendPushNotification(receiver.fcmTokens, {
+          title: senderName,
+          body,
+          data: {
+            senderId: String(decoded.id),
+            messageId: String(message._id),
+            chatId: String(decoded.id),
+            url: `/chat?userId=${decoded.id}`,
+          },
+        });
+
+        console.log(
+          `🔔 Push dispatch result: ${result.successCount} sent, ${result.failureCount} failed.`
+        );
+
+        // Prune stale / invalid tokens
+        if (result.staleTokens && result.staleTokens.length > 0) {
+          await User.findByIdAndUpdate(receiverId, {
+            $pullAll: { fcmTokens: result.staleTokens },
+          });
+          console.log(
+            `🧹 Pruned ${result.staleTokens.length} stale FCM token(s) for user ${receiverId}`
+          );
+        }
+      } else {
+        console.log(`ℹ️ Receiver ${receiverId} has no registered FCM tokens.`);
       }
-    })().catch((err) => {
-      console.error("Unhandled error in background FCM push:", err);
-    });
+    } catch (pushErr) {
+      console.error("⚠️ FCM push notification dispatch error:", pushErr);
+    }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {

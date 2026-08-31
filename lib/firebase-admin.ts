@@ -24,17 +24,28 @@ const isConfigured = Boolean(projectId && clientEmail && rawPrivateKey);
 let app: App | null = null;
 let messaging: Messaging | null = null;
 
+function formatPrivateKey(key: string): string {
+  let cleaned = key.trim();
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  return cleaned.replace(/\\n/g, "\n");
+}
+
 if (isConfigured) {
   try {
     const apps = getApps();
     if (apps.length > 0) {
       app = getApp();
     } else {
-      const privateKey = rawPrivateKey!.replace(/\\n/g, "\n");
+      const privateKey = formatPrivateKey(rawPrivateKey!);
       app = initializeApp({
         credential: cert({
-          projectId,
-          clientEmail,
+          projectId: projectId!.trim(),
+          clientEmail: clientEmail!.trim(),
           privateKey,
         }),
       });
@@ -44,7 +55,7 @@ if (isConfigured) {
       messaging = getMessaging(app);
     }
   } catch (error) {
-    console.warn("⚠️ Failed to initialize Firebase Admin SDK:", error);
+    console.error("❌ Failed to initialize Firebase Admin SDK:", error);
     messaging = null;
   }
 } else {
